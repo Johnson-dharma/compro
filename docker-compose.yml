@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # CompreFace - Open Source Facial Recognition
+  compreface-postgres-db:
+    image: postgres:13
+    container_name: compreface-postgres-db
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=frs
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  compreface-admin:
+    image: exadel/compreface-admin:1.2.0
+    container_name: compreface-admin
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - ENABLE_EMAIL_SERVER=false
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_USERNAME=
+      - EMAIL_FROM=
+      - EMAIL_PASSWORD=
+      - ADMIN_JAVA_OPTS=-Xmx8g
+      - MAX_FILE_SIZE=5MB
+      - MAX_REQUEST_SIZE=10MB
+    depends_on:
+      - compreface-postgres-db
+    ports:
+      - "8000:8080"
+
+  compreface-api:
+    image: exadel/compreface-api:1.2.0
+    container_name: compreface-api
+    depends_on:
+      - compreface-postgres-db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - API_JAVA_OPTS=-Xmx8g
+    ports:
+      - "8001:8080"
+
+  compreface-fe:
+    image: exadel/compreface-fe:1.2.0
+    container_name: compreface-fe
+    ports:
+      - "8002:80"
+    depends_on:
+      - compreface-api
+      - compreface-admin
+    environment:
+      - CLIENT_MAX_BODY_SIZE=10M
+
+  # Thumbor - Open Source Image Processing
+  thumbor:
+    image: thumbororg/thumbor:latest
+    container_name: thumbor
+    environment:
+      - SECURITY_KEY=MY_SECURE_KEY_CHANGE_THIS
+      - THUMBOR_LOG_FORMAT=%(asctime)s %(name)s:%(levelname)s %(message)s
+      - THUMBOR_LOG_DATE_FORMAT=%Y-%m-%d %H:%M:%S
+      - AUTO_WEBP=True
+      - ALLOW_UNSAFE_URL=True
+      - QUALITY=95
+      - DETECTORS=['thumbor.detectors.face_detector','thumbor.detectors.feature_detector']
+    ports:
+      - "8888:8000"
+    volumes:
+      - thumbor-data:/data
+
+  # Redis for caching (optional but recommended)
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  postgres-data:
+  thumbor-data:
+  redis-data:
+
+
